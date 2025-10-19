@@ -2,21 +2,13 @@
 Tests for the command-line interface and main entry point of the script.
 """
 
-import argparse
 import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
-
-from consolidate_project_sources import (
-    GitInfoProvider,
-    ProjectConsolidator,
-    detect_project_root,
-    ensure_gitignore_entry,
-    main,
-    parse_arguments,
-)
+from consolidate_project_sources import (GitInfoProvider, detect_project_root,
+                                         ensure_gitignore_entry, main,
+                                         parse_arguments)
 
 
 def test_parse_arguments_defaults():
@@ -80,7 +72,8 @@ def test_main_successful_run(
     mock_consolidator_class.return_value = mock_consolidator_instance
 
     with patch(
-        "sys.argv", ["script.py", "--output", "out.txt", "--project-root", "/fake"]
+        "sys.argv",
+        ["script.py", "--output", "out.txt", "--project-root", "/fake"],
     ):
         exit_code = main()
 
@@ -90,7 +83,39 @@ def test_main_successful_run(
     mock_ensure_gitignore.assert_called_once()
 
 
-@patch("subprocess.check_output", side_effect=subprocess.CalledProcessError(1, "err"))
+@patch("consolidate_project_sources.ProjectConsolidator")
+@patch("consolidate_project_sources.detect_project_root")
+@patch("consolidate_project_sources.ensure_gitignore_entry")
+@patch("pathlib.Path.exists", return_value=True)
+@patch("pathlib.Path.stat", return_value=MagicMock(st_size=12345))
+def test_main_autodetect_root(
+    mock_stat,
+    mock_exists,
+    mock_ensure_gitignore,
+    mock_detect_root,
+    mock_consolidator_class,
+):
+    """Test the main function's path when auto-detecting project root."""
+    mock_detect_root.return_value = Path("/fake/project")
+    mock_consolidator_instance = MagicMock()
+    mock_consolidator_instance.stats = {
+        "total_files": 1, "included_files": 1, "excluded_files": 0,
+        "sensitive_files": 0, "total_lines": 10, "languages": {"Python": 1}
+    }
+    mock_consolidator_class.return_value = mock_consolidator_instance
+
+    with patch("sys.argv", ["script.py"]):
+        exit_code = main()
+
+    assert exit_code == 0
+    mock_detect_root.assert_called_once()
+    mock_consolidator_class.assert_called_with(Path("/fake/project"), list_env_keys=True)
+
+
+@patch(
+    "subprocess.check_output",
+    side_effect=subprocess.CalledProcessError(1, "err"),
+)
 def test_get_git_info_fails_gracefully(mock_subprocess):
     """Test that get_git_info returns 'unknown' when git commands fail."""
     git_provider = GitInfoProvider(Path("."))
