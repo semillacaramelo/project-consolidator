@@ -1,8 +1,9 @@
 """
 Integration test for full consolidation workflow.
 """
+
 import pytest
-from pathlib import Path
+
 
 @pytest.mark.integration
 def test_full_consolidation_workflow(dummy_project, consolidator_factory):
@@ -15,9 +16,11 @@ def test_full_consolidation_workflow(dummy_project, consolidator_factory):
     output = output_path.read_text()
     # Check included files
     assert 'print("hello")' in output  # app.py
-    assert 'name: CI' in output  # .github/workflows/ci.yml
+    assert "name: CI" in output  # .github/workflows/ci.yml
     # Sensitive file placeholder
-    assert "SENSITIVE (content not included)" in output or "SENSITIVE" in output
+    assert (
+        "SENSITIVE (content not included)" in output or "SENSITIVE" in output
+    )
     # Excluded file not present
     assert "react mock" not in output  # node_modules/react.js
     # Statistics

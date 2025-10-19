@@ -1,9 +1,13 @@
 """
 Unit tests for ProjectConsolidator.is_excluded_dir.
 """
-import pytest
+
 from pathlib import Path
+
+import pytest
+
 from consolidate_project_sources import ProjectConsolidator
+
 
 @pytest.mark.parametrize(
     "dirname,expected",

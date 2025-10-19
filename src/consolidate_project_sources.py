@@ -12,7 +12,6 @@ Features:
 """
 
 import argparse
-import json
 import logging
 import mimetypes
 import os
@@ -26,13 +25,13 @@ from typing import Dict, List, Optional, Set
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s | %(levelname)s | %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
+    format="%(asctime)s | %(levelname)s | %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
 )
 logger = logging.getLogger(__name__)
 
 # Project root - dynamically determined
-# Default to script's parent directory, but will be overridden by CLI arg or auto-detection
+# Default to script's parent, but can be overridden.
 PROJECT_ROOT = Path(__file__).parent.absolute()
 
 # Output file pattern for gitignore
@@ -90,15 +89,55 @@ EXCLUDE_FILES: Set[str] = {
 }
 
 EXCLUDE_EXTENSIONS: Set[str] = {
-    ".pyc", ".pyo", ".pyd", ".so", ".dll", ".dylib", ".exe",
-    ".o", ".a", ".lib", ".obj", ".class", ".jar", ".war",
-    ".png", ".jpg", ".jpeg", ".gif", ".ico", ".svg", ".webp",
-    ".mp4", ".avi", ".mov", ".wmv", ".flv", ".webm",
-    ".mp3", ".wav", ".ogg", ".flac",
-    ".zip", ".tar", ".gz", ".bz2", ".7z", ".rar",
-    ".pdf", ".doc", ".docx", ".xls", ".xlsx",
-    ".woff", ".woff2", ".ttf", ".eot", ".otf",
-    ".lock", ".map",
+    ".pyc",
+    ".pyo",
+    ".pyd",
+    ".so",
+    ".dll",
+    ".dylib",
+    ".exe",
+    ".o",
+    ".a",
+    ".lib",
+    ".obj",
+    ".class",
+    ".jar",
+    ".war",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".ico",
+    ".svg",
+    ".webp",
+    ".mp4",
+    ".avi",
+    ".mov",
+    ".wmv",
+    ".flv",
+    ".webm",
+    ".mp3",
+    ".wav",
+    ".ogg",
+    ".flac",
+    ".zip",
+    ".tar",
+    ".gz",
+    ".bz2",
+    ".7z",
+    ".rar",
+    ".pdf",
+    ".doc",
+    ".docx",
+    ".xls",
+    ".xlsx",
+    ".woff",
+    ".woff2",
+    ".ttf",
+    ".eot",
+    ".otf",
+    ".lock",
+    ".map",
 }
 
 # Sensitive file patterns (check existence, don't include content)
@@ -161,10 +200,10 @@ class ProjectConsolidator:
     def _get_file_stat(self, file_path: Path) -> Optional[os.stat_result]:
         """
         Get file stat with caching to avoid redundant system calls.
-        
+
         Args:
             file_path: Path to the file
-            
+
         Returns:
             os.stat_result or None if stat fails
         """
@@ -179,8 +218,8 @@ class ProjectConsolidator:
     def is_excluded_dir(self, dir_name: str) -> bool:
         """
         Check if directory should be excluded.
-        
-        Note: Uses explicit exclusion list rather than broad pattern matching
+
+        Note: Uses explicit exclusion list, not broad pattern matching.
         to avoid excluding important directories like .github, .devcontainer, etc.
 
         Args:
@@ -192,10 +231,14 @@ class ProjectConsolidator:
         # FIXED: Removed overly broad .startswith(".") check (Issue #4)
         # Now only excludes directories explicitly listed in EXCLUDE_DIRS
         # Normalize to handle dot-prefixed virtualenv dirs like ".venv"
-        normalized = dir_name.lstrip('.')
+        normalized = dir_name.lstrip(".")
         return dir_name in EXCLUDE_DIRS or normalized in EXCLUDE_DIRS
 
-    def is_excluded_file(self, file_path: Path, file_size: Optional[int] = None) -> bool:
+    def is_excluded_file(
+        self,
+        file_path: Path,
+        file_size: Optional[int] = None,
+    ) -> bool:
         """
         Check if file should be excluded.
 
@@ -211,7 +254,7 @@ class ProjectConsolidator:
             file_path = Path(file_path)
 
         # CRITICAL FIX: Force include certain files FIRST (Issue #1)
-        # This must be checked before size limits or other exclusions
+        # This must be checked before size limits or other exclusions.
         if file_path.name in FORCE_INCLUDE_FILES:
             return False
 
@@ -230,7 +273,7 @@ class ProjectConsolidator:
 
         # Check file size (use provided size to avoid redundant stat calls)
         if file_size is None:
-            # Prefer os.path.getsize so unit tests can monkeypatch it
+            # Prefer os.path.getsize for monkeypatching in tests
             try:
                 file_size = os.path.getsize(str(file_path))
             except OSError:
@@ -239,11 +282,12 @@ class ProjectConsolidator:
                 except OSError as e:
                     logger.error(f"Error accessing file {file_path}: {e}")
                     return True
-        
+
         if file_size >= MAX_FILE_SIZE:
             logger.warning(
-                f"File {file_path.relative_to(self.project_root)} "
-                f"exceeds size limit ({file_size:,} bytes), excluding"
+                "File %s exceeds size limit (%s bytes), excluding",
+                file_path.relative_to(self.project_root),
+                f"{file_size:,}",
             )
             return True
 
@@ -296,13 +340,51 @@ class ProjectConsolidator:
 
         # Check by extension
         text_extensions = {
-            ".txt", ".md", ".rst", ".json", ".yaml", ".yml", ".toml",
-            ".ini", ".cfg", ".conf", ".config", ".py", ".js", ".ts",
-            ".jsx", ".tsx", ".css", ".scss", ".html", ".xml", ".sql",
-            ".sh", ".bash", ".zsh", ".go", ".rs", ".java", ".c", ".cpp",
-            ".h", ".hpp", ".rb", ".php", ".lua", ".pl", ".r", ".m",
-            ".vim", ".el", ".clj", ".ex", ".exs", ".Dockerfile",
-            ".gitignore", ".dockerignore",
+            ".txt",
+            ".md",
+            ".rst",
+            ".json",
+            ".yaml",
+            ".yml",
+            ".toml",
+            ".ini",
+            ".cfg",
+            ".conf",
+            ".config",
+            ".py",
+            ".js",
+            ".ts",
+            ".jsx",
+            ".tsx",
+            ".css",
+            ".scss",
+            ".html",
+            ".xml",
+            ".sql",
+            ".sh",
+            ".bash",
+            ".zsh",
+            ".go",
+            ".rs",
+            ".java",
+            ".c",
+            ".cpp",
+            ".h",
+            ".hpp",
+            ".rb",
+            ".php",
+            ".lua",
+            ".pl",
+            ".r",
+            ".m",
+            ".vim",
+            ".el",
+            ".clj",
+            ".ex",
+            ".exs",
+            ".Dockerfile",
+            ".gitignore",
+            ".dockerignore",
         }
         if file_path.suffix.lower() in text_extensions:
             return True
@@ -377,22 +459,22 @@ class ProjectConsolidator:
             commit_hash = subprocess.check_output(
                 ["git", "rev-parse", "HEAD"],
                 cwd=self.project_root,
-                stderr=subprocess.PIPE,  # Capture errors for logging (Issue #9)
-                text=True
+                stderr=subprocess.PIPE,  # Capture errors for logging
+                text=True,
             ).strip()
 
             commit_date = subprocess.check_output(
                 ["git", "log", "-1", "--format=%cd", "--date=iso"],
                 cwd=self.project_root,
                 stderr=subprocess.PIPE,
-                text=True
+                text=True,
             ).strip()
 
             branch = subprocess.check_output(
                 ["git", "branch", "--show-current"],
                 cwd=self.project_root,
                 stderr=subprocess.PIPE,
-                text=True
+                text=True,
             ).strip()
 
             return {
@@ -401,7 +483,10 @@ class ProjectConsolidator:
                 "branch": branch,
             }
         except subprocess.CalledProcessError as e:
-            stderr = e.stderr.strip() if e.stderr else "No error details"
+            if e.stderr:
+                stderr = e.stderr.strip()
+            else:
+                stderr = "No error details"
             logger.warning(f"Git command failed: {stderr}")
             return {
                 "commit": "unknown",
@@ -409,14 +494,20 @@ class ProjectConsolidator:
                 "branch": "unknown",
             }
         except FileNotFoundError:
-            logger.warning("Git executable not found. Please ensure git is installed.")
+            logger.warning(
+                "Git executable not found. Please ensure git is installed."
+            )
             return {
                 "commit": "unknown",
                 "date": "unknown",
                 "branch": "unknown",
             }
 
-    def analyze_sensitive_file(self, file_path: Path, list_env_keys: bool = True) -> Dict[str, str | int | List[str] | bool]:
+    def analyze_sensitive_file(
+        self,
+        file_path: Path,
+        list_env_keys: bool = True,
+    ) -> Dict[str, str | int | List[str] | bool]:
         """
         Analyze sensitive file without exposing content.
 
@@ -460,10 +551,7 @@ class ProjectConsolidator:
         return info
 
     def build_file_tree(
-        self, 
-        directory: Path, 
-        prefix: str = "", 
-        is_last: bool = True
+        self, directory: Path, prefix: str = "", is_last: bool = True
     ) -> List[str]:
         """
         Build a visual tree structure of the project.
@@ -479,8 +567,12 @@ class ProjectConsolidator:
         tree_lines = []
 
         try:
-            items = sorted(directory.iterdir(), key=lambda x: (not x.is_dir(), x.name))
-            items = [item for item in items if not self.is_excluded_dir(item.name)]
+            items = sorted(
+                directory.iterdir(), key=lambda x: (not x.is_dir(), x.name)
+            )
+            items = [
+                item for item in items if not self.is_excluded_dir(item.name)
+            ]
 
             for i, item in enumerate(items):
                 is_last_item = i == len(items) - 1
@@ -491,9 +583,11 @@ class ProjectConsolidator:
 
                 # Add item
                 if item.is_dir():
-                    tree_lines.append(f"{prefix}{connector}{item.name}/")
+                    tree_lines.append(f"{prefix}{connector}{item.name}/ ")
                     # Recurse into directory
-                    sub_tree = self.build_file_tree(item, prefix + extension, is_last_item)
+                    sub_tree = self.build_file_tree(
+                        item, prefix + extension, is_last_item
+                    )
                     tree_lines.extend(sub_tree)
                 elif not self.is_excluded_file(item):
                     tree_lines.append(f"{prefix}{connector}{item.name}")
@@ -548,10 +642,7 @@ class ProjectConsolidator:
             raise
 
     def _write_header(
-        self, 
-        out, 
-        timestamp: datetime, 
-        git_info: Dict[str, str]
+        self, out, timestamp: datetime, git_info: Dict[str, str]
     ) -> None:
         """Write file header."""
         out.write("=" * 80 + "\n")
@@ -559,7 +650,10 @@ class ProjectConsolidator:
         out.write("=" * 80 + "\n\n")
 
         out.write("Project:          Talos Algo AI\n")
-        out.write(f"Consolidation:    {timestamp.strftime('%Y-%m-%d %H:%M:%S')}\n")
+        out.write(
+            f"Consolidation:    "
+            f"{timestamp.strftime('%Y-%m-%d %H:%M:%S')}\n"
+        )
         out.write(f"Git Commit:       {git_info['commit']}\n")
         out.write(f"Git Branch:       {git_info['branch']}\n")
         out.write(f"Commit Date:      {git_info['date']}\n")
@@ -568,8 +662,8 @@ class ProjectConsolidator:
         out.write("\n" + "=" * 80 + "\n")
         out.write("PURPOSE\n")
         out.write("=" * 80 + "\n\n")
-        out.write("This file contains a complete consolidation of the project source code,\n")
         out.write(
+            "This file contains a complete consolidation of the project source code,\n"
             "configuration files, and documentation for auditing and reproduction purposes.\n"
         )
         out.write("\n")
@@ -580,7 +674,9 @@ class ProjectConsolidator:
         out.write("  - Cache and temporary files\n")
         out.write("  - Large files (> 10 MB)\n")
         out.write("\n")
-        out.write("Sensitive files are listed with metadata but content is not included.\n")
+        out.write(
+            "Sensitive files are listed with metadata but content is not included.\n"
+        )
         out.write("\n")
 
     def _write_file_tree(self, out) -> None:
@@ -616,11 +712,15 @@ class ProjectConsolidator:
                     continue
                 # Skip any previously written consolidated output file
                 try:
-                    if hasattr(self, "_output_file") and file_path.resolve() == self._output_file:
+                    if (
+                        hasattr(self, "_output_file")
+                        and file_path.resolve() == self._output_file
+                    ):
                         continue
                 except Exception:
                     # If resolve fails for any reason, fall back to name-based pattern
-                    if re.match(r".*_merged_sources.*\.txt$", file_path.name):
+                    merged_sources_pattern = r".*_merged_sources.*\.txt$"
+                    if re.match(merged_sources_pattern, file_path.name):
                         continue
 
                 self.stats["total_files"] += 1
@@ -641,7 +741,7 @@ class ProjectConsolidator:
                 # Check if sensitive
                 if self.is_sensitive_file(file_path):
                     # Write metadata for sensitive files but do not include content
-                    # in the "included_files" count to avoid inflating included file numbers.
+                    # and avoid inflating included file numbers.
                     self._write_sensitive_file(out, file_path, file_stat)
                     self.stats["sensitive_files"] += 1
                     continue
@@ -652,7 +752,9 @@ class ProjectConsolidator:
 
         logger.info(f"Processed {self.stats['total_files']} files")
 
-    def _write_sensitive_file(self, out, file_path: Path, file_stat: os.stat_result) -> None:
+    def _write_sensitive_file(
+        self, out, file_path: Path, file_stat: os.stat_result
+    ) -> None:
         """Write sensitive file metadata without content."""
         rel_path = file_path.relative_to(self.project_root)
 
@@ -672,19 +774,28 @@ class ProjectConsolidator:
             for key in info["keys"]:
                 out.write(f"  {key}\n")
 
-        out.write("\nNOTE: This is a sensitive file. Content is not included for security.\n")
-        out.write("      The file exists and should be configured separately.\n")
+        out.write(
+            "\nNOTE: This is a sensitive file. "
+            "Content is not included for security.\n"
+        )
+        out.write(
+            "      The file exists and should be " "configured separately.\n"
+        )
         out.write("\n")
 
         logger.info(f"🔒 Sensitive: {rel_path}")
 
-    def _write_regular_file(self, out, file_path: Path, file_stat: os.stat_result) -> None:
+    def _write_regular_file(
+        self, out, file_path: Path, file_stat: os.stat_result
+    ) -> None:
         """Write regular file with content."""
         rel_path = file_path.relative_to(self.project_root)
         language = self.get_file_language(file_path)
 
         # Update language statistics
-        self.stats["languages"][language] = self.stats["languages"].get(language, 0) + 1
+        self.stats["languages"][language] = (
+            self.stats["languages"].get(language, 0) + 1
+        )
 
         try:
             with open(file_path, encoding="utf-8") as f:
@@ -722,7 +833,9 @@ class ProjectConsolidator:
         out.write("CONSOLIDATION STATISTICS\n")
         out.write("=" * 80 + "\n\n")
 
-        out.write(f"Completion Time: {timestamp.strftime('%Y-%m-%d %H:%M:%S')}\n")
+        out.write(
+            f"Completion Time: {timestamp.strftime('%Y-%m-%d %H:%M:%S')}\n"
+        )
         out.write(f"Total Files Scanned: {self.stats['total_files']}\n")
         out.write(f"Files Included: {self.stats['included_files']}\n")
         out.write(f"Files Excluded: {self.stats['excluded_files']}\n")
@@ -731,7 +844,9 @@ class ProjectConsolidator:
         out.write("\n")
 
         out.write("Language Distribution:\n")
-        sorted_langs = sorted(self.stats["languages"].items(), key=lambda x: x[1], reverse=True)
+        sorted_langs = sorted(
+            self.stats["languages"].items(), key=lambda x: x[1], reverse=True
+        )
         for lang, count in sorted_langs:
             out.write(f"  {lang:20s} {count:4d} files\n")
 
@@ -745,43 +860,45 @@ def ensure_gitignore_entry(update_gitignore: bool = True) -> None:
     """
     Ensure the output file pattern is in .gitignore.
     Creates .gitignore if it doesn't exist.
-    
+
     Args:
         update_gitignore: Whether to actually update the gitignore (default: True)
     """
     if not update_gitignore:
         logger.debug("Skipping .gitignore update (disabled by user)")
         return
-        
+
     gitignore_path = PROJECT_ROOT / ".gitignore"
-    
+
     try:
         # Read existing .gitignore content
         if gitignore_path.exists():
             with open(gitignore_path, "r", encoding="utf-8") as f:
                 content = f.read()
-                
+
             # Check if pattern already exists
             if OUTPUT_FILE_PATTERN in content:
-                logger.debug(f".gitignore already contains {OUTPUT_FILE_PATTERN}")
+                logger.debug(
+                    f".gitignore already contains {OUTPUT_FILE_PATTERN}"
+                )
                 return
-                
+
             # Append pattern
             with open(gitignore_path, "a", encoding="utf-8") as f:
                 if not content.endswith("\n"):
                     f.write("\n")
-                f.write(f"\n# Exclude consolidated source files\n")
+                f.write("\n# Exclude consolidated source files\n")
                 f.write(f"{OUTPUT_FILE_PATTERN}\n")
-                
+
             logger.info(f"Added {OUTPUT_FILE_PATTERN} to .gitignore")
         else:
             # Create new .gitignore
             with open(gitignore_path, "w", encoding="utf-8") as f:
-                f.write(f"# Exclude consolidated source files\n")
+                f.write("# Exclude consolidated source files\n")
                 f.write(f"{OUTPUT_FILE_PATTERN}\n")
-                
+
             logger.info(f"Created .gitignore with {OUTPUT_FILE_PATTERN}")
-            
+
     except OSError as e:
         logger.warning(f"Could not update .gitignore: {e}")
 
@@ -789,24 +906,24 @@ def ensure_gitignore_entry(update_gitignore: bool = True) -> None:
 def detect_project_root() -> Path:
     """
     Detect the project root directory by looking for common markers.
-    
+
     Returns:
         Path to detected project root, or script directory as fallback
     """
     current = Path(__file__).parent.absolute()
-    
+
     # Common project root markers
     root_markers = {
-        '.git',
-        'package.json',
-        'requirements.txt',
-        'pyproject.toml',
-        'setup.py',
-        'Cargo.toml',
-        'go.mod',
-        '.gitignore'
+        ".git",
+        "package.json",
+        "requirements.txt",
+        "pyproject.toml",
+        "setup.py",
+        "Cargo.toml",
+        "go.mod",
+        ".gitignore",
     }
-    
+
     # Walk up the directory tree looking for markers
     max_depth = 5
     for _ in range(max_depth):
@@ -815,16 +932,18 @@ def detect_project_root() -> Path:
             if (current / marker).exists():
                 logger.debug(f"Detected project root via {marker}: {current}")
                 return current
-        
+
         # Move up one level
         parent = current.parent
         if parent == current:  # Reached filesystem root
             break
         current = parent
-    
+
     # Fallback to script directory
     fallback = Path(__file__).parent.absolute()
-    logger.debug(f"No project root markers found, using script directory: {fallback}")
+    logger.debug(
+        f"No project root markers found, using script directory: {fallback}"
+    )
     return fallback
 
 
@@ -844,55 +963,56 @@ Examples:
   %(prog)s --output custom.txt      # Specify custom output file
   %(prog)s --verbose                # Enable verbose logging
   %(prog)s --project-root /path     # Specify project root directory
-        """
+        """,
     )
-    
+
     parser.add_argument(
         "--output",
         type=Path,
         help="Output file path (default: auto-generated with timestamp)",
-        metavar="FILE"
+        metavar="FILE",
     )
-    
+
     parser.add_argument(
         "--project-root",
         type=Path,
         help="Project root directory (default: auto-detect or script directory)",
-        metavar="DIR"
+        metavar="DIR",
     )
-    
+
     parser.add_argument(
-        "--verbose",
-        action="store_true",
-        help="Enable verbose output"
+        "--verbose", action="store_true", help="Enable verbose output"
     )
-    
+
     parser.add_argument(
         "--no-update-gitignore",
         action="store_true",
-        help="Don't automatically update .gitignore (Issue #6)"
+        help="Don't automatically update .gitignore (Issue #6)",
     )
-    
+
     parser.add_argument(
         "--no-list-env-keys",
         action="store_true",
-        help="Don't list environment variable keys from .env files (more secure)"
+        help="Don't list environment variable keys from .env files (more secure)",
     )
-    
+
     parser.add_argument(
         "--max-file-size",
         type=int,
         default=MAX_FILE_SIZE,
-        help=f"Maximum file size to include in bytes (default: {MAX_FILE_SIZE:,})",
-        metavar="BYTES"
+        help=(
+            "Maximum file size to include in bytes "
+            f"(default: {MAX_FILE_SIZE:,})"
+        ),
+        metavar="BYTES",
     )
-    
+
     parser.add_argument(
         "--version",
         action="version",
-        version="%(prog)s 2.1 (with audit fixes)"
+        version="%(prog)s 2.1 (with audit fixes)",
     )
-    
+
     return parser.parse_args()
 
 
@@ -905,22 +1025,22 @@ def main() -> int:
     """
     # Parse arguments
     args = parse_arguments()
-    
+
     # Configure logging level
     if args.verbose:
         logger.setLevel(logging.DEBUG)
-    
+
     # Determine project root
     if args.project_root:
         project_root = args.project_root.absolute()
     else:
         project_root = detect_project_root()
-    
+
     # Validate project root exists
     if not project_root.exists():
         logger.error(f"Project root does not exist: {project_root}")
         return 1
-    
+
     # Generate output filename if not provided
     if args.output:
         output_path = args.output
@@ -945,8 +1065,7 @@ def main() -> int:
 
     # Create consolidator with options
     consolidator = ProjectConsolidator(
-        project_root,
-        list_env_keys=not args.no_list_env_keys
+        project_root, list_env_keys=not args.no_list_env_keys
     )
 
     # Run consolidation
@@ -958,25 +1077,37 @@ def main() -> int:
         logger.info("CONSOLIDATION SUMMARY")
         logger.info("=" * 80)
         logger.info(f"Output File:        {output_path}")
-        logger.info(f"File Size:          {output_path.stat().st_size:,} bytes")
+        logger.info(
+            f"File Size:          " f"{output_path.stat().st_size:,} bytes"
+        )
         logger.info(f"Total Files:        {consolidator.stats['total_files']}")
-        logger.info(f"Included:           {consolidator.stats['included_files']}")
-        logger.info(f"Excluded:           {consolidator.stats['excluded_files']}")
-        logger.info(f"Sensitive:          {consolidator.stats['sensitive_files']}")
-        logger.info(f"Total Lines:        {consolidator.stats['total_lines']:,}")
-        
+        logger.info(
+            f"Included:           {consolidator.stats['included_files']}"
+        )
+        logger.info(
+            f"Excluded:           {consolidator.stats['excluded_files']}"
+        )
+        logger.info(
+            f"Sensitive:          {consolidator.stats['sensitive_files']}"
+        )
+        logger.info(
+            f"Total Lines:        {consolidator.stats['total_lines']:,}"
+        )
+
         logger.info("\nTop Languages:")
         sorted_langs = sorted(
-            consolidator.stats["languages"].items(), key=lambda x: x[1], reverse=True
+            consolidator.stats["languages"].items(),
+            key=lambda x: x[1],
+            reverse=True,
         )[:5]
         for lang, count in sorted_langs:
             logger.info(f"  {lang:20s} {count:4d} files")
-        
+
         logger.info("\n✅ Consolidation completed successfully!")
         return 0
 
     except Exception as e:
-        logger.exception(f"Error during consolidation: {e}")
+        logger.exception("Error during consolidation: %s", e)
         return 1
 
 

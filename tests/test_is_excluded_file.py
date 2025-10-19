@@ -1,9 +1,13 @@
 """
 Unit tests for ProjectConsolidator.is_excluded_file.
 """
-import pytest
+
 from pathlib import Path
+
+import pytest
+
 from consolidate_project_sources import ProjectConsolidator
+
 
 @pytest.mark.parametrize(
     "filename,size,expected,reason",
@@ -15,7 +19,9 @@ from consolidate_project_sources import ProjectConsolidator
         ("main.py", 100, False, "normal source file included"),
     ],
 )
-def test_is_excluded_file_parametrized(monkeypatch, filename, size, expected, reason):
+def test_is_excluded_file_parametrized(
+    monkeypatch, filename, size, expected, reason
+):
     """
     Test is_excluded_file for various filenames, sizes, and exclusion rules.
     """
