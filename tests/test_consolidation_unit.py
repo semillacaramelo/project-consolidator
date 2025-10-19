@@ -1,12 +1,12 @@
 """
-Unit tests for ProjectConsolidator.is_excluded_dir.
+Unit tests for FileWalker.is_excluded_dir.
 """
 
 from pathlib import Path
 
 import pytest
 
-from consolidate_project_sources import ProjectConsolidator
+from consolidate_project_sources import FileWalker
 
 
 @pytest.mark.parametrize(
@@ -16,11 +16,13 @@ from consolidate_project_sources import ProjectConsolidator
         (".git", True),
         (".github", False),
         ("src", False),
+        ("venv", True),
+        (".venv", True),
     ],
 )
 def test_is_excluded_dir_parametrized(dirname: str, expected: bool):
     """
     Test is_excluded_dir returns correct boolean for various directory names.
     """
-    consolidator = ProjectConsolidator(Path("."))
-    assert consolidator.is_excluded_dir(dirname) is expected
+    file_walker = FileWalker(Path("."))
+    assert file_walker.is_excluded_dir(dirname) is expected

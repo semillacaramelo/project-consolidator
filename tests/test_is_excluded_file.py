@@ -1,12 +1,12 @@
 """
-Unit tests for ProjectConsolidator.is_excluded_file.
+Unit tests for FileWalker.is_excluded_file.
 """
 
 from pathlib import Path
 
 import pytest
 
-from consolidate_project_sources import ProjectConsolidator
+from consolidate_project_sources import FileWalker
 
 
 @pytest.mark.parametrize(
@@ -25,8 +25,8 @@ def test_is_excluded_file_parametrized(
     """
     Test is_excluded_file for various filenames, sizes, and exclusion rules.
     """
-    consolidator = ProjectConsolidator(Path("."))
+    file_walker = FileWalker(Path("."))
     # Patch os.path.getsize to return the test size
     monkeypatch.setattr("os.path.getsize", lambda _: size)
-    result = consolidator.is_excluded_file(filename)
+    result = file_walker.is_excluded_file(filename)
     assert result is expected, f"{filename}: {reason}"

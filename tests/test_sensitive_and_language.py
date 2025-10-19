@@ -4,7 +4,7 @@ Unit tests for sensitive file detection and language mapping.
 
 import pytest
 
-from consolidate_project_sources import ProjectConsolidator
+from consolidate_project_sources import FileWalker, ProjectConsolidator
 
 
 @pytest.mark.parametrize(
@@ -38,5 +38,5 @@ def test_get_file_language(filename, expected):
     """
     Test get_file_language for various file extensions and names.
     """
-    result = ProjectConsolidator.get_file_language(filename)
+    result = FileWalker.get_file_language(filename)
     assert result == expected
