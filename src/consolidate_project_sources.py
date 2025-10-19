@@ -13,6 +13,7 @@ Features:
 
 import argparse
 import logging
+import fnmatch
 import mimetypes
 import os
 import re
@@ -36,15 +37,16 @@ PROJECT_ROOT = Path(__file__).parent.absolute()
 
 # Output file pattern for gitignore
 OUTPUT_FILE_PATTERN = "*_merged_sources*.txt"
+OUTPUT_FILE_REGEX = re.compile(fnmatch.translate(OUTPUT_FILE_PATTERN))
 
 # Exclude patterns (directories and files to skip)
 # Note: Explicit list avoids accidentally excluding important dirs like .github
 EXCLUDE_DIRS: Set[str] = {
+    "venv",
     ".venv",
     "node_modules",
     "__pycache__",
     ".next",
-    "venv",
     "env",
     ".git",
     ".vscode",
@@ -170,6 +172,211 @@ FORCE_INCLUDE_FILES: Set[str] = {
 # Maximum file size to include (10,000,000 bytes = 10 MB approx)
 # Use 10_000_000 to match test expectations
 MAX_FILE_SIZE: int = 10_000_000
+
+
+TEXT_EXTENSIONS = {
+    ".txt", ".md", ".rst", ".json", ".yaml", ".yml", ".toml", ".ini",
+    ".cfg", ".conf", ".config", ".py", ".js", ".ts", ".jsx", ".tsx",
+    ".css", ".scss", ".html", ".xml", ".sql", ".sh", ".bash", ".zsh",
+    ".go", ".rs", ".java", ".c", ".cpp", ".h", ".hpp", ".rb", ".php",
+    ".lua", ".pl", ".r", ".m", ".vim", ".el", ".clj", ".ex", ".exs",
+    ".Dockerfile", ".gitignore", ".dockerignore",
+}
+
+LANGUAGE_MAP = {
+    ".py": "Python", ".js": "JavaScript", ".ts": "TypeScript",
+    ".jsx": "React JSX", ".tsx": "React TSX", ".css": "CSS", ".scss": "SCSS",
+    ".html": "HTML", ".json": "JSON", ".yaml": "YAML", ".yml": "YAML",
+    ".toml": "TOML", ".md": "Markdown", ".sql": "SQL", ".sh": "Shell",
+    ".bash": "Bash", ".go": "Go", ".rs": "Rust", ".java": "Java",
+    ".c": "C", ".cpp": "C++", ".h": "C Header", ".hpp": "C++ Header",
+}
+
+
+class FileWalker:
+    """Handles walking the file system and applying exclusion logic."""
+
+    def __init__(self, project_root: Path):
+        self.project_root = project_root
+
+    def is_excluded_dir(self, dir_name: str) -> bool:
+        """
+        Check if directory should be excluded.
+
+        Note: Uses explicit exclusion list, not broad pattern matching,
+        to avoid excluding important directories like .github, .devcontainer,
+        etc.
+
+        Args:
+            dir_name: Name of the directory to check
+
+        Returns:
+            True if directory should be excluded, False otherwise
+        """
+        # FIXED: Removed overly broad .startswith(".") check (Issue #4)
+        # Now only excludes directories explicitly listed in EXCLUDE_DIRS
+        return dir_name in EXCLUDE_DIRS
+
+    def is_excluded_file(
+        self,
+        file_path: Path,
+        file_size: Optional[int] = None,
+    ) -> bool:
+        """
+        Check if file should be excluded.
+
+        Args:
+            file_path: Path to the file to check
+            file_size: Optional file size in bytes (to avoid redundant stat
+                       calls)
+
+        Returns:
+            True if file should be excluded, False otherwise
+        """
+        # Allow callers to pass a string filename for convenience in tests
+        if not isinstance(file_path, Path):
+            file_path = Path(file_path)
+
+        # CRITICAL FIX: Force include certain files FIRST (Issue #1)
+        # This must be checked before size limits or other exclusions.
+        if file_path.name in FORCE_INCLUDE_FILES:
+            return False
+
+        # Check extension
+        if file_path.suffix.lower() in EXCLUDE_EXTENSIONS:
+            return True
+
+        # Check filename patterns
+        for pattern in EXCLUDE_FILES:
+            if fnmatch.fnmatch(file_path.name, pattern):
+                return True
+
+        # Check file size (use provided size to avoid redundant stat calls)
+        if file_size is None:
+            # Prefer os.path.getsize for monkeypatching in tests
+            try:
+                file_size = os.path.getsize(str(file_path))
+            except OSError:
+                try:
+                    file_size = file_path.stat().st_size
+                except OSError as e:
+                    logger.error(f"Error accessing file {file_path}: {e}")
+                    return True
+
+        if file_size >= MAX_FILE_SIZE:
+            log_msg = "File %s exceeds size limit (%s bytes), excluding"
+            logger.warning(
+                log_msg,
+                file_path.relative_to(self.project_root),
+                f"{file_size:,}",
+            )
+            return True
+
+        # Check if binary
+        if not self.is_text_file(file_path):
+            return True
+
+        return False
+
+    def is_text_file(self, file_path: Path) -> bool:
+        """
+        Check if file is text (not binary).
+
+        Args:
+            file_path: Path to the file to check
+
+        Returns:
+            True if file is text, False otherwise
+        """
+        # Force include certain files
+        if file_path.name in FORCE_INCLUDE_FILES:
+            return True
+
+        # Check by mime type
+        mime_type, _ = mimetypes.guess_type(str(file_path))
+        if mime_type and mime_type.startswith("text"):
+            return True
+
+        # Check by extension
+        if file_path.suffix.lower() in TEXT_EXTENSIONS:
+            return True
+
+        # Try to read as text
+        try:
+            with open(file_path, encoding="utf-8") as f:
+                f.read(512)  # Read first 512 bytes
+            return True
+        except (OSError, UnicodeDecodeError):
+            return False
+
+    @staticmethod
+    def get_file_language(file_path: Path | str) -> str:
+        """
+        Detect file language/type.
+
+        Args:
+            file_path: Path to the file
+
+        Returns:
+            Detected language/type as string
+        """
+        # Accept either a Path or string
+        if not isinstance(file_path, Path):
+            name = str(file_path)
+            ext = Path(name).suffix.lower()
+        else:
+            ext = file_path.suffix.lower()
+            name = file_path.name
+
+        # Special-case known filenames
+        if name == "Dockerfile":
+            return "Docker"
+
+        # Default to 'Text' for unknown text-like files
+        return LANGUAGE_MAP.get(ext, "Text")
+
+    def build_file_tree(self, directory: Path, prefix: str = "") -> List[str]:
+        """
+        Build a visual tree structure of the project.
+
+        Args:
+            directory: Directory to build tree from
+            prefix: Current line prefix for tree formatting
+
+        Returns:
+            List of tree lines
+        """
+        tree_lines = []
+
+        try:
+            items = sorted(
+                directory.iterdir(), key=lambda x: (not x.is_dir(), x.name)
+            )
+            items = [
+                item
+                for item in items
+                if not self.is_excluded_dir(item.name)
+            ]
+
+            for i, item in enumerate(items):
+                is_last_item = i == len(items) - 1
+
+                # Tree characters
+                connector = "└── " if is_last_item else "├── "
+                extension = "    " if is_last_item else "│   "
+
+                # Add item
+                if item.is_dir():
+                    tree_lines.append(f"{prefix}{connector}{item.name}/")
+                    # Recurse into directory
+                    sub_tree = self.build_file_tree(item, prefix + extension)
+                    tree_lines.extend(sub_tree)
+                elif not self.is_excluded_file(item):
+                    tree_lines.append(f"{prefix}{connector}{item.name}")
+        except PermissionError as e:
+            logger.warning(f"Permission denied accessing {directory}: {e}")
+
+        return tree_lines
 
 
 class ReportGenerator:
@@ -350,7 +557,9 @@ class ProjectConsolidator:
         self.file_tree: List[str] = []
         # Cache for file stats to avoid redundant stat() calls (Issue #3)
         self._file_stats_cache: Dict[Path, os.stat_result] = {}
+        self._output_file: Optional[Path] = None
         self.report_generator = ReportGenerator(self.project_root)
+        self.file_walker = FileWalker(self.project_root)
 
     def _get_file_stat(self, file_path: Path) -> Optional[os.stat_result]:
         """
@@ -369,91 +578,6 @@ class ProjectConsolidator:
                 logger.error(f"Error accessing {file_path}: {e}")
                 return None
         return self._file_stats_cache[file_path]
-
-    def is_excluded_dir(self, dir_name: str) -> bool:
-        """
-        Check if directory should be excluded.
-
-        Note: Uses explicit exclusion list, not broad pattern matching,
-        to avoid excluding important directories like .github, .devcontainer,
-        etc.
-
-        Args:
-            dir_name: Name of the directory to check
-
-        Returns:
-            True if directory should be excluded, False otherwise
-        """
-        # FIXED: Removed overly broad .startswith(".") check (Issue #4)
-        # Now only excludes directories explicitly listed in EXCLUDE_DIRS
-        # Normalize to handle dot-prefixed virtualenv dirs like ".venv"
-        normalized = dir_name.lstrip(".")
-        return dir_name in EXCLUDE_DIRS or normalized in EXCLUDE_DIRS
-
-    def is_excluded_file(
-        self,
-        file_path: Path,
-        file_size: Optional[int] = None,
-    ) -> bool:
-        """
-        Check if file should be excluded.
-
-        Args:
-            file_path: Path to the file to check
-            file_size: Optional file size in bytes (to avoid redundant stat
-                       calls)
-
-        Returns:
-            True if file should be excluded, False otherwise
-        """
-        # Allow callers to pass a string filename for convenience in tests
-        if not isinstance(file_path, Path):
-            file_path = Path(file_path)
-
-        # CRITICAL FIX: Force include certain files FIRST (Issue #1)
-        # This must be checked before size limits or other exclusions.
-        if file_path.name in FORCE_INCLUDE_FILES:
-            return False
-
-        # Check extension
-        if file_path.suffix.lower() in EXCLUDE_EXTENSIONS:
-            return True
-
-        # Check filename patterns
-        for pattern in EXCLUDE_FILES:
-            if "*" in pattern:
-                regex = pattern.replace(".", r"\.").replace("*", ".*")
-                if re.match(regex, file_path.name):
-                    return True
-            elif file_path.name == pattern:
-                return True
-
-        # Check file size (use provided size to avoid redundant stat calls)
-        if file_size is None:
-            # Prefer os.path.getsize for monkeypatching in tests
-            try:
-                file_size = os.path.getsize(str(file_path))
-            except OSError:
-                try:
-                    file_size = file_path.stat().st_size
-                except OSError as e:
-                    logger.error(f"Error accessing file {file_path}: {e}")
-                    return True
-
-        if file_size >= MAX_FILE_SIZE:
-            log_msg = "File %s exceeds size limit (%s bytes), excluding"
-            logger.warning(
-                log_msg,
-                file_path.relative_to(self.project_root),
-                f"{file_size:,}",
-            )
-            return True
-
-        # Check if binary
-        if not self.is_text_file(file_path):
-            return True
-
-        return False
 
     @staticmethod
     def is_sensitive_file(file_path: Path | str) -> bool:
@@ -476,135 +600,6 @@ class ProjectConsolidator:
             if re.search(pattern, file_str, re.IGNORECASE):
                 return True
         return False
-
-    def is_text_file(self, file_path: Path) -> bool:
-        """
-        Check if file is text (not binary).
-
-        Args:
-            file_path: Path to the file to check
-
-        Returns:
-            True if file is text, False otherwise
-        """
-        # Force include certain files
-        if file_path.name in FORCE_INCLUDE_FILES:
-            return True
-
-        # Check by mime type
-        mime_type, _ = mimetypes.guess_type(str(file_path))
-        if mime_type and mime_type.startswith("text"):
-            return True
-
-        # Check by extension
-        text_extensions = {
-            ".txt",
-            ".md",
-            ".rst",
-            ".json",
-            ".yaml",
-            ".yml",
-            ".toml",
-            ".ini",
-            ".cfg",
-            ".conf",
-            ".config",
-            ".py",
-            ".js",
-            ".ts",
-            ".jsx",
-            ".tsx",
-            ".css",
-            ".scss",
-            ".html",
-            ".xml",
-            ".sql",
-            ".sh",
-            ".bash",
-            ".zsh",
-            ".go",
-            ".rs",
-            ".java",
-            ".c",
-            ".cpp",
-            ".h",
-            ".hpp",
-            ".rb",
-            ".php",
-            ".lua",
-            ".pl",
-            ".r",
-            ".m",
-            ".vim",
-            ".el",
-            ".clj",
-            ".ex",
-            ".exs",
-            ".Dockerfile",
-            ".gitignore",
-            ".dockerignore",
-        }
-        if file_path.suffix.lower() in text_extensions:
-            return True
-
-        # Try to read as text
-        try:
-            with open(file_path, encoding="utf-8") as f:
-                f.read(512)  # Read first 512 bytes
-            return True
-        except (OSError, UnicodeDecodeError):
-            return False
-
-    @staticmethod
-    def get_file_language(file_path: Path | str) -> str:
-        """
-        Detect file language/type.
-
-        Args:
-            file_path: Path to the file
-
-        Returns:
-            Detected language/type as string
-        """
-        # Accept either a Path or string
-        if not isinstance(file_path, Path):
-            name = str(file_path)
-            ext = Path(name).suffix.lower()
-        else:
-            ext = file_path.suffix.lower()
-            name = file_path.name
-
-        # Special-case known filenames
-        if name == "Dockerfile":
-            return "Docker"
-        language_map = {
-            ".py": "Python",
-            ".js": "JavaScript",
-            ".ts": "TypeScript",
-            ".jsx": "React JSX",
-            ".tsx": "React TSX",
-            ".css": "CSS",
-            ".scss": "SCSS",
-            ".html": "HTML",
-            ".json": "JSON",
-            ".yaml": "YAML",
-            ".yml": "YAML",
-            ".toml": "TOML",
-            ".md": "Markdown",
-            ".sql": "SQL",
-            ".sh": "Shell",
-            ".bash": "Bash",
-            ".go": "Go",
-            ".rs": "Rust",
-            ".java": "Java",
-            ".c": "C",
-            ".cpp": "C++",
-            ".h": "C Header",
-            ".hpp": "C++ Header",
-        }
-
-        # Default to 'Text' for unknown text-like files
-        return language_map.get(ext, "Text")
 
     def get_git_info(self) -> Dict[str, str]:
         """
@@ -680,7 +675,7 @@ class ProjectConsolidator:
         info = {
             "exists": True,
             "size": file_path.stat().st_size,
-            "type": self.get_file_language(file_path),
+            "type": self.file_walker.get_file_language(file_path),
         }
 
         # For .env files, optionally list keys without values
@@ -709,52 +704,6 @@ class ProjectConsolidator:
 
         return info
 
-    def build_file_tree(
-        self, directory: Path, prefix: str = "", is_last: bool = True
-    ) -> List[str]:
-        """
-        Build a visual tree structure of the project.
-
-        Args:
-            directory: Directory to build tree from
-            prefix: Current line prefix for tree formatting
-            is_last: Whether this is the last item in current level
-
-        Returns:
-            List of tree lines
-        """
-        tree_lines = []
-
-        try:
-            items = sorted(
-                directory.iterdir(), key=lambda x: (not x.is_dir(), x.name)
-            )
-            items = [
-                item for item in items if not self.is_excluded_dir(item.name)
-            ]
-
-            for i, item in enumerate(items):
-                is_last_item = i == len(items) - 1
-
-                # Tree characters
-                connector = "└── " if is_last_item else "├── "
-                extension = "    " if is_last_item else "│   "
-
-                # Add item
-                if item.is_dir():
-                    tree_lines.append(f"{prefix}{connector}{item.name}/")
-                    # Recurse into directory
-                    sub_tree = self.build_file_tree(
-                        item, prefix + extension, is_last_item
-                    )
-                    tree_lines.extend(sub_tree)
-                elif not self.is_excluded_file(item):
-                    tree_lines.append(f"{prefix}{connector}{item.name}")
-        except PermissionError as e:
-            logger.warning(f"Permission denied accessing {directory}: {e}")
-
-        return tree_lines
-
     def consolidate(self, output_file: Path) -> None:
         """
         Consolidate all project files into output file.
@@ -782,7 +731,7 @@ class ProjectConsolidator:
                 self.report_generator.write_header(out, timestamp, git_info)
 
                 # Write file tree
-                tree_lines = self.build_file_tree(self.project_root)
+                tree_lines = self.file_walker.build_file_tree(self.project_root)
                 self.report_generator.write_file_tree(out, tree_lines)
 
                 # Walk through project
@@ -807,7 +756,7 @@ class ProjectConsolidator:
 
         for root, dirs, files in os.walk(self.project_root):
             # Filter out excluded directories
-            dirs[:] = [d for d in dirs if not self.is_excluded_dir(d)]
+            dirs[:] = [d for d in dirs if not self.file_walker.is_excluded_dir(d)]
 
             root_path = Path(root)
 
@@ -819,17 +768,11 @@ class ProjectConsolidator:
                     continue
                 # Skip any previously written consolidated output file
                 try:
-                    is_output_file = (
-                        hasattr(self, "_output_file")
-                        and file_path.resolve() == self._output_file
-                    )
-                    if is_output_file:
+                    if self._output_file and file_path.resolve() == self._output_file:
                         continue
                 except Exception:
-                    # If resolve fails for any reason, fall back to
-                    # name-based pattern
-                    pattern = r".*_merged_sources.*\.txt$"
-                    if re.match(pattern, file_path.name):
+                    # If resolve fails, fall back to name-based pattern matching
+                    if OUTPUT_FILE_REGEX.match(file_path.name):
                         continue
 
                 self.stats["total_files"] += 1
@@ -843,7 +786,7 @@ class ProjectConsolidator:
                 file_size = file_stat.st_size
 
                 # Check if excluded (passing file_size to avoid redundant stat)
-                if self.is_excluded_file(file_path, file_size):
+                if self.file_walker.is_excluded_file(file_path, file_size):
                     self.stats["excluded_files"] += 1
                     continue
 
@@ -852,7 +795,7 @@ class ProjectConsolidator:
                     info = self.analyze_sensitive_file(
                         file_path, self.list_env_keys
                     )
-                    language = self.get_file_language(file_path)
+                    language = self.file_walker.get_file_language(file_path)
                     self.report_generator.write_sensitive_file(
                         out, file_path, file_stat, info, language
                     )
@@ -868,7 +811,7 @@ class ProjectConsolidator:
                     line_count = len(lines)
                     self.stats["total_lines"] += line_count
 
-                    language = self.get_file_language(file_path)
+                    language = self.file_walker.get_file_language(file_path)
                     lang_stats = self.stats["languages"]
                     lang_stats[language] = lang_stats.get(language, 0) + 1
 
@@ -954,8 +897,7 @@ def detect_project_root() -> Path:
     }
 
     # Walk up the directory tree looking for markers
-    max_depth = 5
-    for _ in range(max_depth):
+    while current.parent != current:
         # Check if any marker exists in current directory
         for marker in root_markers:
             if (current / marker).exists():
@@ -963,10 +905,7 @@ def detect_project_root() -> Path:
                 return current
 
         # Move up one level
-        parent = current.parent
-        if parent == current:  # Reached filesystem root
-            break
-        current = parent
+        current = current.parent
 
     # Fallback to script directory
     fallback = Path(__file__).parent.absolute()
