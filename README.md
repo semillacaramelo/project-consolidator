@@ -110,17 +110,37 @@ pytest --cov=consolidate_project_sources
 
 ## Contributing
 
-Contributions welcome! Please:
-1. Fork the repository
-2. Create a feature branch
-3. Add tests for new features
-4. Submit a pull request
+Contributions are highly welcome! To ensure a smooth development process, please follow these guidelines:
+
+1.  **Fork & Branch**: Fork the repository and create a new feature branch for your work.
+2.  **Setup**: Install development dependencies and set up the pre-commit hooks:
+    ```bash
+    pip install -r requirements-dev.txt
+    pre-commit install
+    ```
+3.  **Code**: Write clean, well-documented code. Ensure all new logic is accompanied by tests.
+4.  **Test**: Run the full test suite to ensure your changes don't break existing functionality.
+    ```bash
+    pytest
+    ```
+5.  **Submit**: Push your changes and submit a pull request. The CI pipeline will automatically run linting and test checks.
 
 ## License
 
 MIT License - See LICENSE file for details
 
 ## Changelog
+
+### v3.0 (2025-10-19) - Architectural Refactor
+- **Major Refactoring**: Decomposed the monolithic `ProjectConsolidator` class into smaller, single-responsibility classes (`GitInfoProvider`, `FileWalker`, `ReportGenerator`) for improved maintainability and testability.
+- **CI Enhancements**:
+    - Added a `lint` job to the CI pipeline using `pre-commit` to enforce code style.
+    - Enforced an 85% test coverage threshold to prevent regressions.
+- **Code Hardening**:
+    - Replaced naive wildcard matching with `fnmatch` for robust file exclusion.
+    - Improved project root detection to be more reliable.
+    - Standardized dependency files (`requirements.txt` and `requirements-dev.txt`).
+- **Increased Test Coverage**: Added comprehensive tests for CLI, utility functions, and error handling, bringing coverage to >85%.
 
 ### v2.1 (2025-10-18)
 - Fixed force-include logic bug

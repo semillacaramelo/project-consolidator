@@ -1,7 +1,7 @@
 """
 conftest.py: Centralized fixtures for tests.
 """
-
+import subprocess
 from pathlib import Path
 from typing import Generator
 
@@ -11,11 +11,12 @@ import pytest
 @pytest.fixture
 def dummy_project(tmp_path: Path) -> Generator[Path, None, None]:
     """
-    Creates a dummy project structure in a temporary directory.
+    Creates a dummy project structure in a temporary directory, initializes it
+    as a Git repository, and commits the files.
     Includes:
       - app.py
-      - .env
-      - README.md (force-included)
+      - .env (sensitive)
+      - README.md
       - node_modules/react.js (excluded dir)
       - .github/workflows/ci.yml
     """
@@ -28,6 +29,14 @@ def dummy_project(tmp_path: Path) -> Generator[Path, None, None]:
     github_wf = tmp_path / ".github" / "workflows"
     github_wf.mkdir(parents=True)
     (github_wf / "ci.yml").write_text("name: CI\n")
+
+    # Initialize Git repo to make sure Git-related functions work
+    subprocess.run(["git", "init"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "add", "."], cwd=tmp_path, check=True)
+    subprocess.run(
+        ["git", "commit", "-m", "Initial commit"], cwd=tmp_path, check=True
+    )
+
     yield tmp_path
 
 

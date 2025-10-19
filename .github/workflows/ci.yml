@@ -1,17 +1,31 @@
-name: Python CI
+name: Python Project CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [ "main" ]
   pull_request:
-    branches: [ main ]
+    branches: [ "main" ]
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install pre-commit
+        run: pip install pre-commit
+      - name: Run pre-commit
+        run: pre-commit run --all-files
+
   test:
+    needs: lint
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.10, 3.11]
+        python-version: ['3.11', '3.12']
     steps:
       - uses: actions/checkout@v4
       - name: Setup Python
@@ -21,11 +35,18 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
           pip install -r requirements-dev.txt
       - name: Run tests with coverage
-        run: pytest --cov=src --cov-report=xml --cov-report=term-missing
-      - name: Upload coverage report as artifact
-        uses: actions/upload-artifact@v4
+        run: >
+          pytest
+          --cov=src
+          --cov-report=xml
+          --cov-report=term-missing
+          --cov-fail-under=85
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
         with:
-          name: coverage-report
-          path: coverage.xml
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage.xml
+          fail_ci_if_error: true

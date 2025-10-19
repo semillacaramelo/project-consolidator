@@ -24,5 +24,5 @@ def test_full_consolidation_workflow(dummy_project, consolidator_factory):
     # Excluded file not present
     assert "react mock" not in output  # node_modules/react.js
     # Statistics
-    assert "Files Included: 3" in output
+    assert "Included Files: 3" in output
     assert "Sensitive Files: 1" in output

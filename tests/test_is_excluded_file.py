@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from consolidate_project_sources import ProjectConsolidator
+from consolidate_project_sources import FileWalker
 
 
 @pytest.mark.parametrize(
@@ -25,8 +25,9 @@ def test_is_excluded_file_parametrized(
     """
     Test is_excluded_file for various filenames, sizes, and exclusion rules.
     """
-    consolidator = ProjectConsolidator(Path("."))
-    # Patch os.path.getsize to return the test size
-    monkeypatch.setattr("os.path.getsize", lambda _: size)
-    result = consolidator.is_excluded_file(filename)
+    file_walker = FileWalker(Path("."))
+    # Mock the stat result to avoid needing a real file
+    mock_stat = type("stat", (), {"st_size": size})
+    monkeypatch.setattr("pathlib.Path.stat", lambda self: mock_stat)
+    result = file_walker.is_excluded_file(Path(filename))
     assert result is expected, f"{filename}: {reason}"
