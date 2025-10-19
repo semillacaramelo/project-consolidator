@@ -99,8 +99,12 @@ def test_main_autodetect_root(
     mock_detect_root.return_value = Path("/fake/project")
     mock_consolidator_instance = MagicMock()
     mock_consolidator_instance.stats = {
-        "total_files": 1, "included_files": 1, "excluded_files": 0,
-        "sensitive_files": 0, "total_lines": 10, "languages": {"Python": 1}
+        "total_files": 1,
+        "included_files": 1,
+        "excluded_files": 0,
+        "sensitive_files": 0,
+        "total_lines": 10,
+        "languages": {"Python": 1},
     }
     mock_consolidator_class.return_value = mock_consolidator_instance
 
@@ -109,7 +113,9 @@ def test_main_autodetect_root(
 
     assert exit_code == 0
     mock_detect_root.assert_called_once()
-    mock_consolidator_class.assert_called_with(Path("/fake/project"), list_env_keys=True)
+    mock_consolidator_class.assert_called_with(
+        Path("/fake/project"), list_env_keys=True
+    )
 
 
 @patch(
