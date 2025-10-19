@@ -267,10 +267,7 @@ class ProjectConsolidator:
         # Check filename patterns
         for pattern in EXCLUDE_FILES:
             if "*" in pattern:
-                regex = (
-                    pattern.replace(".", r"\.")
-                    .replace("*", ".*")
-                )
+                regex = pattern.replace(".", r"\.").replace("*", ".*")
                 if re.match(regex, file_path.name):
                     return True
             elif file_path.name == pattern:
@@ -519,7 +516,8 @@ class ProjectConsolidator:
 
         Args:
             file_path: Path to the sensitive file
-            list_env_keys: Whether to list environment variable keys (default: True)
+            list_env_keys: Whether to list environment variable keys
+            (default: True)
 
         Returns:
             Dictionary with file metadata
@@ -617,7 +615,7 @@ class ProjectConsolidator:
         timestamp = datetime.now()
 
         try:
-            # Store the output file path so it can be excluded during processing
+            # Store output file path for exclusion during processing
             try:
                 self._output_file = output_file.resolve()
             except Exception:
@@ -656,7 +654,7 @@ class ProjectConsolidator:
         out.write("=" * 80 + "\n\n")
 
         out.write("Project:          Talos Algo AI\n")
-        time_str = timestamp.strftime('%Y-%m-%d %H:%M:%S')
+        time_str = timestamp.strftime("%Y-%m-%d %H:%M:%S")
         out.write(f"Consolidation:    {time_str}\n")
         out.write(f"Git Commit:       {git_info['commit']}\n")
         out.write(f"Git Branch:       {git_info['branch']}\n")
@@ -673,16 +671,15 @@ class ProjectConsolidator:
         )
         out.write("\n")
         out.write("Exclusions:\n")
-        out.write(
-            "  - Binary files (images, compiled code, executables)\n"
-        )
+        out.write("  - Binary files (images, compiled code, executables)\n")
         out.write("  - Dependencies (node_modules, venv, etc.)\n")
         out.write("  - Generated files (.next, dist, build)\n")
         out.write("  - Cache and temporary files\n")
         out.write("  - Large files (> 10 MB)\n")
         out.write("\n")
         out.write(
-            "Sensitive files are listed with metadata but content is not included.\n"
+            "Sensitive files are listed with metadata but "
+            "content is not included.\n"
         )
         out.write("\n")
 
@@ -749,7 +746,7 @@ class ProjectConsolidator:
 
                 # Check if sensitive
                 if self.is_sensitive_file(file_path):
-                    # Write metadata for sensitive files but do not include content
+                    # Write metadata for sensitive files (content excluded)
                     # and avoid inflating included file numbers.
                     self._write_sensitive_file(out, file_path, file_stat)
                     self.stats["sensitive_files"] += 1
@@ -868,7 +865,8 @@ def ensure_gitignore_entry(update_gitignore: bool = True) -> None:
     Creates .gitignore if it doesn't exist.
 
     Args:
-        update_gitignore: Whether to actually update the gitignore (default: True)
+        update_gitignore: Whether to actually update the gitignore
+        (default: True)
     """
     if not update_gitignore:
         logger.debug("Skipping .gitignore update (disabled by user)")
@@ -975,14 +973,14 @@ Examples:
     parser.add_argument(
         "--output",
         type=Path,
-        help="Output file path (default: auto-generated with timestamp)",
+        help="Output file path (default: auto-generated)",
         metavar="FILE",
     )
 
     parser.add_argument(
         "--project-root",
         type=Path,
-        help="Project root directory (default: auto-detect or script directory)",
+        help="Project root directory (default: auto-detect)",
         metavar="DIR",
     )
 
