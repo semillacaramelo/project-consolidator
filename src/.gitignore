@@ -1,0 +1,2 @@
+# Exclude consolidated source files
+*_merged_sources*.txt

@@ -11,6 +11,7 @@ Professional Python CLI tool for consolidating project source code into a single
 - ⚡ Performance optimized with stat caching
 - 🎯 Type-hinted and well-documented
 - 🛡️ Security-first (key redaction)
+- 🏗️ Modular and highly-testable architecture
 
 ## Quick Start
 
@@ -113,14 +114,30 @@ pytest --cov=consolidate_project_sources
 Contributions welcome! Please:
 1. Fork the repository
 2. Create a feature branch
-3. Add tests for new features
-4. Submit a pull request
+3. **Set up the development environment and pre-commit hooks:**
+   ```bash
+   pip install -r requirements-dev.txt
+   pre-commit install
+   ```
+4. Add tests for new features
+5. **Ensure all checks pass locally before pushing:**
+   ```bash
+   pre-commit run --all-files
+   pytest
+   ```
+6. Submit a pull request. All pull requests must pass automated linting and maintain a test coverage of at least 85%.
 
 ## License
 
 MIT License - See LICENSE file for details
 
 ## Changelog
+
+### v2.2 (2025-10-19)
+- **Architectural Refactor:** Decomposed the main `ProjectConsolidator` class into smaller, single-responsibility classes (`FileWalker`, `ReportGenerator`, `GitInfoProvider`).
+- **Improved Robustness:** Replaced custom pattern matching with the standard `fnmatch` library.
+- **Hardened Code Quality:** Eliminated DRY violations, improved class state initialization, and cleaned up minor code issues.
+- **Enhanced CI:** Added automated linting and test coverage enforcement to the CI pipeline.
 
 ### v2.1 (2025-10-18)
 - Fixed force-include logic bug
