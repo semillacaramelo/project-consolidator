@@ -172,6 +172,160 @@ FORCE_INCLUDE_FILES: Set[str] = {
 MAX_FILE_SIZE: int = 10_000_000
 
 
+class ReportGenerator:
+    """Generates the final consolidated text report."""
+
+    def __init__(self, project_root: Path):
+        self.project_root = project_root
+
+    def write_header(
+        self, out, timestamp: datetime, git_info: Dict[str, str]
+    ) -> None:
+        """Write file header."""
+        out.write("=" * 80 + "\n")
+        out.write("PROJECT SOURCE CODE CONSOLIDATION\n")
+        out.write("=" * 80 + "\n\n")
+
+        out.write("Project:          Talos Algo AI\n")
+        time_str = timestamp.strftime("%Y-%m-%d %H:%M:%S")
+        out.write(f"Consolidation:    {time_str}\n")
+        out.write(f"Git Commit:       {git_info['commit']}\n")
+        out.write(f"Git Branch:       {git_info['branch']}\n")
+        out.write(f"Commit Date:      {git_info['date']}\n")
+        out.write(f"Project Root:     {self.project_root}\n")
+
+        out.write("\n" + "=" * 80 + "\n")
+        out.write("PURPOSE\n")
+        out.write("=" * 80 + "\n\n")
+        out.write(
+            "This file contains a complete consolidation of the project "
+            "source code,\nconfiguration files, and documentation for "
+            "auditing and reproduction purposes.\n"
+        )
+        out.write("\n")
+        out.write("Exclusions:\n")
+        out.write("  - Binary files (images, compiled code, executables)\n")
+        out.write("  - Dependencies (node_modules, venv, etc.)\n")
+        out.write("  - Generated files (.next, dist, build)\n")
+        out.write("  - Cache and temporary files\n")
+        out.write("  - Large files (> 10 MB)\n")
+        out.write("\n")
+        out.write(
+            "Sensitive files are listed with metadata but "
+            "content is not included.\n"
+        )
+        out.write("\n")
+
+    def write_file_tree(self, out, tree_lines: List[str]) -> None:
+        """Write project file tree."""
+        out.write("=" * 80 + "\n")
+        out.write("PROJECT STRUCTURE\n")
+        out.write("=" * 80 + "\n\n")
+
+        out.write(f"{self.project_root.name}/\n")
+        for line in tree_lines:
+            out.write(line + "\n")
+
+        out.write("\n")
+
+    def write_source_files_header(self, out) -> None:
+        """Writes the header for the source files section."""
+        out.write("=" * 80 + "\n")
+        out.write("SOURCE FILES\n")
+        out.write("=" * 80 + "\n\n")
+
+    def write_sensitive_file(
+        self, out, file_path: Path, file_stat: os.stat_result, info: Dict, language: str
+    ) -> None:
+        """Write sensitive file metadata without content."""
+        rel_path = file_path.relative_to(self.project_root)
+
+        out.write("\n" + "-" * 80 + "\n")
+        out.write(f"FILE: {rel_path}\n")
+        out.write("-" * 80 + "\n")
+        out.write("Type:      SENSITIVE (content not included)\n")
+        out.write(f"Location:  {rel_path}\n")
+        out.write(f"Size:      {file_stat.st_size} bytes\n")
+        out.write(f"Language:  {language}\n")
+
+        if "keys" in info:
+            out.write("\nEnvironment Variables:\n")
+            for key in info["keys"]:
+                out.write(f"  {key}\n")
+
+        out.write("\nNOTE: This is a sensitive file. ")
+        out.write("Content is not included for security.\n")
+        out.write(
+            "      The file exists and should be " "configured separately.\n"
+        )
+        out.write("\n")
+
+        logger.info(f"🔒 Sensitive: {rel_path}")
+
+    def write_regular_file(
+        self,
+        out,
+        file_path: Path,
+        file_stat: os.stat_result,
+        content: str,
+        line_count: int,
+        language: str,
+    ) -> None:
+        """Write regular file with content."""
+        rel_path = file_path.relative_to(self.project_root)
+
+        out.write("\n" + "-" * 80 + "\n")
+        out.write(f"FILE: {rel_path}\n")
+        out.write("-" * 80 + "\n")
+        out.write(f"Location:   {rel_path}\n")
+        out.write(f"Language:   {language}\n")
+        out.write(f"Lines:      {line_count}\n")
+        out.write(f"Size:       {file_stat.st_size} bytes\n")
+        out.write("-" * 80 + "\n\n")
+
+        out.write(content)
+
+        if not content.endswith("\n"):
+            out.write("\n")
+
+        out.write("\n")
+
+        logger.debug(f"✓ Included: {rel_path} ({line_count} lines)")
+
+    def write_error(self, out, rel_path: Path, error: Exception) -> None:
+        """Writes an error message for a file that couldn't be read."""
+        out.write(f"\nERROR: Unable to read file: {error}\n\n")
+        logger.error(f"✗ Error reading {rel_path}: {error}")
+
+    def write_statistics(self, out, timestamp: datetime, stats: Dict) -> None:
+        """Write consolidation statistics."""
+        out.write("=" * 80 + "\n")
+        out.write("CONSOLIDATION STATISTICS\n")
+        out.write("=" * 80 + "\n\n")
+
+        out.write(
+            f"Completion Time: {timestamp.strftime('%Y-%m-%d %H:%M:%S')}\n"
+        )
+        out.write(f"Total Files Scanned: {stats['total_files']}\n")
+        out.write(f"Files Included: {stats['included_files']}\n")
+        out.write(f"Files Excluded: {stats['excluded_files']}\n")
+        out.write(f"Sensitive Files: {stats['sensitive_files']}\n")
+        out.write(f"Total Lines of Code: {stats['total_lines']:,}\n")
+        out.write("\n")
+
+        out.write("Language Distribution:\n")
+        sorted_langs = sorted(
+            stats["languages"].items(), key=lambda x: x[1], reverse=True
+        )
+        for lang, count in sorted_langs:
+            out.write(f"  {lang:20s} {count:4d} files\n")
+
+        out.write("\n")
+        out.write("=" * 80 + "\n")
+        out.write("END OF CONSOLIDATION\n")
+        out.write("=" * 80 + "\n")
+
+
 class ProjectConsolidator:
     """Consolidates project source code into a single auditable file."""
 
@@ -196,6 +350,7 @@ class ProjectConsolidator:
         self.file_tree: List[str] = []
         # Cache for file stats to avoid redundant stat() calls (Issue #3)
         self._file_stats_cache: Dict[Path, os.stat_result] = {}
+        self.report_generator = ReportGenerator(self.project_root)
 
     def _get_file_stat(self, file_path: Path) -> Optional[os.stat_result]:
         """
@@ -624,16 +779,17 @@ class ProjectConsolidator:
 
             with open(output_file, "w", encoding="utf-8") as out:
                 # Write header
-                self._write_header(out, timestamp, git_info)
+                self.report_generator.write_header(out, timestamp, git_info)
 
                 # Write file tree
-                self._write_file_tree(out)
+                tree_lines = self.build_file_tree(self.project_root)
+                self.report_generator.write_file_tree(out, tree_lines)
 
                 # Walk through project
                 self._process_files(out)
 
                 # Write statistics
-                self._write_statistics(out, timestamp)
+                self.report_generator.write_statistics(out, timestamp, self.stats)
 
             logger.info("Consolidation complete!")
             logger.info(f"Output file: {output_file}")
@@ -645,62 +801,9 @@ class ProjectConsolidator:
             logger.error(f"Error writing to output file {output_file}: {e}")
             raise
 
-    def _write_header(
-        self, out, timestamp: datetime, git_info: Dict[str, str]
-    ) -> None:
-        """Write file header."""
-        out.write("=" * 80 + "\n")
-        out.write("PROJECT SOURCE CODE CONSOLIDATION\n")
-        out.write("=" * 80 + "\n\n")
-
-        out.write("Project:          Talos Algo AI\n")
-        time_str = timestamp.strftime("%Y-%m-%d %H:%M:%S")
-        out.write(f"Consolidation:    {time_str}\n")
-        out.write(f"Git Commit:       {git_info['commit']}\n")
-        out.write(f"Git Branch:       {git_info['branch']}\n")
-        out.write(f"Commit Date:      {git_info['date']}\n")
-        out.write(f"Project Root:     {self.project_root}\n")
-
-        out.write("\n" + "=" * 80 + "\n")
-        out.write("PURPOSE\n")
-        out.write("=" * 80 + "\n\n")
-        out.write(
-            "This file contains a complete consolidation of the project "
-            "source code,\nconfiguration files, and documentation for "
-            "auditing and reproduction purposes.\n"
-        )
-        out.write("\n")
-        out.write("Exclusions:\n")
-        out.write("  - Binary files (images, compiled code, executables)\n")
-        out.write("  - Dependencies (node_modules, venv, etc.)\n")
-        out.write("  - Generated files (.next, dist, build)\n")
-        out.write("  - Cache and temporary files\n")
-        out.write("  - Large files (> 10 MB)\n")
-        out.write("\n")
-        out.write(
-            "Sensitive files are listed with metadata but "
-            "content is not included.\n"
-        )
-        out.write("\n")
-
-    def _write_file_tree(self, out) -> None:
-        """Write project file tree."""
-        out.write("=" * 80 + "\n")
-        out.write("PROJECT STRUCTURE\n")
-        out.write("=" * 80 + "\n\n")
-
-        tree_lines = self.build_file_tree(self.project_root)
-        out.write(f"{self.project_root.name}/\n")
-        for line in tree_lines:
-            out.write(line + "\n")
-
-        out.write("\n")
-
     def _process_files(self, out) -> None:
         """Process and write all files."""
-        out.write("=" * 80 + "\n")
-        out.write("SOURCE FILES\n")
-        out.write("=" * 80 + "\n\n")
+        self.report_generator.write_source_files_header(out)
 
         for root, dirs, files in os.walk(self.project_root):
             # Filter out excluded directories
@@ -746,117 +849,39 @@ class ProjectConsolidator:
 
                 # Check if sensitive
                 if self.is_sensitive_file(file_path):
-                    # Write metadata for sensitive files (content excluded)
-                    # and avoid inflating included file numbers.
-                    self._write_sensitive_file(out, file_path, file_stat)
+                    info = self.analyze_sensitive_file(
+                        file_path, self.list_env_keys
+                    )
+                    language = self.get_file_language(file_path)
+                    self.report_generator.write_sensitive_file(
+                        out, file_path, file_stat, info, language
+                    )
                     self.stats["sensitive_files"] += 1
                     continue
 
                 # Write regular file
-                self._write_regular_file(out, file_path, file_stat)
-                self.stats["included_files"] += 1
+                try:
+                    with open(file_path, "r", encoding="utf-8") as f:
+                        content = f.read()
+
+                    lines = content.split("\n")
+                    line_count = len(lines)
+                    self.stats["total_lines"] += line_count
+
+                    language = self.get_file_language(file_path)
+                    lang_stats = self.stats["languages"]
+                    lang_stats[language] = lang_stats.get(language, 0) + 1
+
+                    self.report_generator.write_regular_file(
+                        out, file_path, file_stat, content, line_count, language
+                    )
+                    self.stats["included_files"] += 1
+                except (OSError, UnicodeDecodeError) as e:
+                    self.report_generator.write_error(
+                        out, file_path.relative_to(self.project_root), e
+                    )
 
         logger.info(f"Processed {self.stats['total_files']} files")
-
-    def _write_sensitive_file(
-        self, out, file_path: Path, file_stat: os.stat_result
-    ) -> None:
-        """Write sensitive file metadata without content."""
-        rel_path = file_path.relative_to(self.project_root)
-
-        out.write("\n" + "-" * 80 + "\n")
-        out.write(f"FILE: {rel_path}\n")
-        out.write("-" * 80 + "\n")
-        out.write("Type:      SENSITIVE (content not included)\n")
-        out.write(f"Location:  {rel_path}\n")
-        out.write(f"Size:      {file_stat.st_size} bytes\n")
-        out.write(f"Language:  {self.get_file_language(file_path)}\n")
-
-        # Analyze sensitive file
-        info = self.analyze_sensitive_file(file_path, self.list_env_keys)
-
-        if "keys" in info:
-            out.write("\nEnvironment Variables:\n")
-            for key in info["keys"]:
-                out.write(f"  {key}\n")
-
-        out.write("\nNOTE: This is a sensitive file. ")
-        out.write("Content is not included for security.\n")
-        out.write(
-            "      The file exists and should be " "configured separately.\n"
-        )
-        out.write("\n")
-
-        logger.info(f"🔒 Sensitive: {rel_path}")
-
-    def _write_regular_file(
-        self, out, file_path: Path, file_stat: os.stat_result
-    ) -> None:
-        """Write regular file with content."""
-        rel_path = file_path.relative_to(self.project_root)
-        language = self.get_file_language(file_path)
-
-        # Update language statistics
-        lang_stats = self.stats["languages"]
-        lang_stats[language] = lang_stats.get(language, 0) + 1
-
-        try:
-            with open(file_path, encoding="utf-8") as f:
-                content = f.read()
-
-            lines = content.split("\n")
-            line_count = len(lines)
-            self.stats["total_lines"] += line_count
-
-            out.write("\n" + "-" * 80 + "\n")
-            out.write(f"FILE: {rel_path}\n")
-            out.write("-" * 80 + "\n")
-            out.write(f"Location:   {rel_path}\n")
-            out.write(f"Language:   {language}\n")
-            out.write(f"Lines:      {line_count}\n")
-            out.write(f"Size:       {file_stat.st_size} bytes\n")
-            out.write("-" * 80 + "\n\n")
-
-            out.write(content)
-
-            if not content.endswith("\n"):
-                out.write("\n")
-
-            out.write("\n")
-
-            logger.debug(f"✓ Included: {rel_path} ({line_count} lines)")
-
-        except Exception as e:
-            out.write(f"\nERROR: Unable to read file: {e}\n\n")
-            logger.error(f"✗ Error reading {rel_path}: {e}")
-
-    def _write_statistics(self, out, timestamp: datetime) -> None:
-        """Write consolidation statistics."""
-        out.write("=" * 80 + "\n")
-        out.write("CONSOLIDATION STATISTICS\n")
-        out.write("=" * 80 + "\n\n")
-
-        out.write(
-            f"Completion Time: {timestamp.strftime('%Y-%m-%d %H:%M:%S')}\n"
-        )
-        out.write(f"Total Files Scanned: {self.stats['total_files']}\n")
-        out.write(f"Files Included: {self.stats['included_files']}\n")
-        out.write(f"Files Excluded: {self.stats['excluded_files']}\n")
-        out.write(f"Sensitive Files: {self.stats['sensitive_files']}\n")
-        out.write(f"Total Lines of Code: {self.stats['total_lines']:,}\n")
-        out.write("\n")
-
-        out.write("Language Distribution:\n")
-        sorted_langs = sorted(
-            self.stats["languages"].items(), key=lambda x: x[1], reverse=True
-        )
-        for lang, count in sorted_langs:
-            out.write(f"  {lang:20s} {count:4d} files\n")
-
-        out.write("\n")
-        out.write("=" * 80 + "\n")
-        out.write("END OF CONSOLIDATION\n")
-        out.write("=" * 80 + "\n")
 
 
 def ensure_gitignore_entry(update_gitignore: bool = True) -> None:
