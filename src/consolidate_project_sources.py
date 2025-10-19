@@ -826,9 +826,11 @@ class ProjectConsolidator:
 
             logger.debug(f"✓ Included: {rel_path} ({line_count} lines)")
 
-        except Exception as e:
-            out.write(f"\nERROR: Unable to read file: {e}\n\n")
-            logger.error(f"✗ Error reading {rel_path}: {e}")
+        except (OSError, UnicodeDecodeError) as e:
+            # OSError covers file-not-found, permission errors, etc.
+            # UnicodeDecodeError handles files that are not valid UTF-8.
+            out.write(f"\nERROR: Unable to read file {rel_path}: {type(e).__name__} - {e}\n\n")
+            logger.error(f"✗ Error reading {rel_path}: {type(e).__name__} - {e}")
 
     def _write_statistics(self, out, timestamp: datetime) -> None:
         """Write consolidation statistics."""
