@@ -34,7 +34,7 @@ def dummy_project(tmp_path: Path) -> Generator[Path, None, None]:
 @pytest.fixture
 def consolidator_factory() -> Generator:
     """
-    Returns a factory that creates ProjectConsolidator instances given a root path.
+    Returns a factory to create ProjectConsolidator instances.
     Imports the ProjectConsolidator from the package entry-point module.
     """
     from consolidate_project_sources import ProjectConsolidator

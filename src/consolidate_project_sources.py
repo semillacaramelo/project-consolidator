@@ -211,7 +211,7 @@ class ProjectConsolidator:
             try:
                 self._file_stats_cache[file_path] = file_path.stat()
             except OSError as e:
-                logger.error(f"Error accessing file {file_path}: {e}")
+                logger.error(f"Error accessing {file_path}: {e}")
                 return None
         return self._file_stats_cache[file_path]
 
@@ -219,8 +219,9 @@ class ProjectConsolidator:
         """
         Check if directory should be excluded.
 
-        Note: Uses explicit exclusion list, not broad pattern matching.
-        to avoid excluding important directories like .github, .devcontainer, etc.
+        Note: Uses explicit exclusion list, not broad pattern matching,
+        to avoid excluding important directories like .github, .devcontainer,
+        etc.
 
         Args:
             dir_name: Name of the directory to check
@@ -244,7 +245,8 @@ class ProjectConsolidator:
 
         Args:
             file_path: Path to the file to check
-            file_size: Optional file size in bytes (to avoid redundant stat calls)
+            file_size: Optional file size in bytes (to avoid redundant stat
+                       calls)
 
         Returns:
             True if file should be excluded, False otherwise
@@ -265,7 +267,10 @@ class ProjectConsolidator:
         # Check filename patterns
         for pattern in EXCLUDE_FILES:
             if "*" in pattern:
-                regex = pattern.replace(".", r"\.").replace("*", ".*")
+                regex = (
+                    pattern.replace(".", r"\.")
+                    .replace("*", ".*")
+                )
                 if re.match(regex, file_path.name):
                     return True
             elif file_path.name == pattern:
@@ -284,8 +289,9 @@ class ProjectConsolidator:
                     return True
 
         if file_size >= MAX_FILE_SIZE:
+            log_msg = "File %s exceeds size limit (%s bytes), excluding"
             logger.warning(
-                "File %s exceeds size limit (%s bytes), excluding",
+                log_msg,
                 file_path.relative_to(self.project_root),
                 f"{file_size:,}",
             )
@@ -526,7 +532,7 @@ class ProjectConsolidator:
 
         # For .env files, optionally list keys without values
         # SECURITY NOTE: Key names can be sensitive (Issue #5)
-        if file_path.name.startswith(".env") and list_env_keys:
+        if file_path.name.startswith(".env") and self.list_env_keys:
             try:
                 with open(file_path, encoding="utf-8") as f:
                     lines = f.readlines()
@@ -536,7 +542,7 @@ class ProjectConsolidator:
                     line = line.strip()
                     if line and not line.startswith("#") and "=" in line:
                         key = line.split("=")[0].strip()
-                        # Redact middle portion of key name for additional security
+                        # Redact middle portion of key name for security
                         if len(key) > 8:
                             redacted = f"{key[:4]}...{key[-2:]}={{Exists}}"
                         else:
@@ -583,7 +589,7 @@ class ProjectConsolidator:
 
                 # Add item
                 if item.is_dir():
-                    tree_lines.append(f"{prefix}{connector}{item.name}/ ")
+                    tree_lines.append(f"{prefix}{connector}{item.name}/")
                     # Recurse into directory
                     sub_tree = self.build_file_tree(
                         item, prefix + extension, is_last_item
@@ -650,10 +656,8 @@ class ProjectConsolidator:
         out.write("=" * 80 + "\n\n")
 
         out.write("Project:          Talos Algo AI\n")
-        out.write(
-            f"Consolidation:    "
-            f"{timestamp.strftime('%Y-%m-%d %H:%M:%S')}\n"
-        )
+        time_str = timestamp.strftime('%Y-%m-%d %H:%M:%S')
+        out.write(f"Consolidation:    {time_str}\n")
         out.write(f"Git Commit:       {git_info['commit']}\n")
         out.write(f"Git Branch:       {git_info['branch']}\n")
         out.write(f"Commit Date:      {git_info['date']}\n")
@@ -663,12 +667,15 @@ class ProjectConsolidator:
         out.write("PURPOSE\n")
         out.write("=" * 80 + "\n\n")
         out.write(
-            "This file contains a complete consolidation of the project source code,\n"
-            "configuration files, and documentation for auditing and reproduction purposes.\n"
+            "This file contains a complete consolidation of the project "
+            "source code,\nconfiguration files, and documentation for "
+            "auditing and reproduction purposes.\n"
         )
         out.write("\n")
         out.write("Exclusions:\n")
-        out.write("  - Binary files (images, compiled code, executables)\n")
+        out.write(
+            "  - Binary files (images, compiled code, executables)\n"
+        )
         out.write("  - Dependencies (node_modules, venv, etc.)\n")
         out.write("  - Generated files (.next, dist, build)\n")
         out.write("  - Cache and temporary files\n")
@@ -712,15 +719,17 @@ class ProjectConsolidator:
                     continue
                 # Skip any previously written consolidated output file
                 try:
-                    if (
+                    is_output_file = (
                         hasattr(self, "_output_file")
                         and file_path.resolve() == self._output_file
-                    ):
+                    )
+                    if is_output_file:
                         continue
                 except Exception:
-                    # If resolve fails for any reason, fall back to name-based pattern
-                    merged_sources_pattern = r".*_merged_sources.*\.txt$"
-                    if re.match(merged_sources_pattern, file_path.name):
+                    # If resolve fails for any reason, fall back to
+                    # name-based pattern
+                    pattern = r".*_merged_sources.*\.txt$"
+                    if re.match(pattern, file_path.name):
                         continue
 
                 self.stats["total_files"] += 1
@@ -733,7 +742,7 @@ class ProjectConsolidator:
 
                 file_size = file_stat.st_size
 
-                # Check if excluded (now passing file_size to avoid redundant stat)
+                # Check if excluded (passing file_size to avoid redundant stat)
                 if self.is_excluded_file(file_path, file_size):
                     self.stats["excluded_files"] += 1
                     continue
@@ -774,10 +783,8 @@ class ProjectConsolidator:
             for key in info["keys"]:
                 out.write(f"  {key}\n")
 
-        out.write(
-            "\nNOTE: This is a sensitive file. "
-            "Content is not included for security.\n"
-        )
+        out.write("\nNOTE: This is a sensitive file. ")
+        out.write("Content is not included for security.\n")
         out.write(
             "      The file exists and should be " "configured separately.\n"
         )
@@ -793,9 +800,8 @@ class ProjectConsolidator:
         language = self.get_file_language(file_path)
 
         # Update language statistics
-        self.stats["languages"][language] = (
-            self.stats["languages"].get(language, 0) + 1
-        )
+        lang_stats = self.stats["languages"]
+        lang_stats[language] = lang_stats.get(language, 0) + 1
 
         try:
             with open(file_path, encoding="utf-8") as f:
@@ -955,7 +961,7 @@ def parse_arguments() -> argparse.Namespace:
         Parsed arguments namespace
     """
     parser = argparse.ArgumentParser(
-        description="Consolidate project source code into a single auditable file",
+        description="Consolidate project source code into a single file.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -993,7 +999,7 @@ Examples:
     parser.add_argument(
         "--no-list-env-keys",
         action="store_true",
-        help="Don't list environment variable keys from .env files (more secure)",
+        help="Don't list .env file keys (more secure)",
     )
 
     parser.add_argument(
@@ -1047,7 +1053,8 @@ def main() -> int:
     else:
         timestamp = datetime.now()
         project_name = project_root.name.replace(" ", "_").lower()
-        output_filename = f"{project_name}_{timestamp.strftime('%Y%m%d_%H%M')}_merged_sources.txt"
+        date_str = timestamp.strftime("%Y%m%d_%H%M")
+        output_filename = f"{project_name}_{date_str}_merged_sources.txt"
         output_path = project_root / output_filename
 
     logger.info("=" * 80)

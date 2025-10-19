@@ -20,7 +20,7 @@ from consolidate_project_sources import ProjectConsolidator
 )
 def test_is_excluded_dir_parametrized(dirname: str, expected: bool):
     """
-    Test that is_excluded_dir returns correct boolean for various directory names.
+    Test is_excluded_dir returns correct boolean for various directory names.
     """
     consolidator = ProjectConsolidator(Path("."))
     assert consolidator.is_excluded_dir(dirname) is expected
