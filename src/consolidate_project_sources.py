@@ -12,8 +12,8 @@ Features:
 """
 
 import argparse
-import logging
 import fnmatch
+import logging
 import mimetypes
 import os
 import re
@@ -174,22 +174,140 @@ FORCE_INCLUDE_FILES: Set[str] = {
 MAX_FILE_SIZE: int = 10_000_000
 
 
+class GitInfoProvider:
+    """Provides git repository information."""
+
+    def __init__(self, project_root: Path):
+        self.project_root = project_root
+
+    def get_git_info(self) -> Dict[str, str]:
+        """
+        Get current git commit information.
+
+        Returns:
+            Dictionary with commit hash, date, and branch
+        """
+        try:
+            commit_hash = subprocess.check_output(
+                ["git", "rev-parse", "HEAD"],
+                cwd=self.project_root,
+                stderr=subprocess.PIPE,  # Capture errors for logging
+                text=True,
+            ).strip()
+
+            commit_date = subprocess.check_output(
+                ["git", "log", "-1", "--format=%cd", "--date=iso"],
+                cwd=self.project_root,
+                stderr=subprocess.PIPE,
+                text=True,
+            ).strip()
+
+            branch = subprocess.check_output(
+                ["git", "branch", "--show-current"],
+                cwd=self.project_root,
+                stderr=subprocess.PIPE,
+                text=True,
+            ).strip()
+
+            return {
+                "commit": commit_hash[:8],
+                "date": commit_date,
+                "branch": branch,
+            }
+        except subprocess.CalledProcessError as e:
+            if e.stderr:
+                stderr = e.stderr.strip()
+            else:
+                stderr = "No error details"
+            logger.warning(f"Git command failed: {stderr}")
+            return {
+                "commit": "unknown",
+                "date": "unknown",
+                "branch": "unknown",
+            }
+        except FileNotFoundError:
+            logger.warning(
+                "Git executable not found. Please ensure git is installed."
+            )
+            return {
+                "commit": "unknown",
+                "date": "unknown",
+                "branch": "unknown",
+            }
+
+
 TEXT_EXTENSIONS = {
-    ".txt", ".md", ".rst", ".json", ".yaml", ".yml", ".toml", ".ini",
-    ".cfg", ".conf", ".config", ".py", ".js", ".ts", ".jsx", ".tsx",
-    ".css", ".scss", ".html", ".xml", ".sql", ".sh", ".bash", ".zsh",
-    ".go", ".rs", ".java", ".c", ".cpp", ".h", ".hpp", ".rb", ".php",
-    ".lua", ".pl", ".r", ".m", ".vim", ".el", ".clj", ".ex", ".exs",
-    ".Dockerfile", ".gitignore", ".dockerignore",
+    ".txt",
+    ".md",
+    ".rst",
+    ".json",
+    ".yaml",
+    ".yml",
+    ".toml",
+    ".ini",
+    ".cfg",
+    ".conf",
+    ".config",
+    ".py",
+    ".js",
+    ".ts",
+    ".jsx",
+    ".tsx",
+    ".css",
+    ".scss",
+    ".html",
+    ".xml",
+    ".sql",
+    ".sh",
+    ".bash",
+    ".zsh",
+    ".go",
+    ".rs",
+    ".java",
+    ".c",
+    ".cpp",
+    ".h",
+    ".hpp",
+    ".rb",
+    ".php",
+    ".lua",
+    ".pl",
+    ".r",
+    ".m",
+    ".vim",
+    ".el",
+    ".clj",
+    ".ex",
+    ".exs",
+    ".Dockerfile",
+    ".gitignore",
+    ".dockerignore",
 }
 
 LANGUAGE_MAP = {
-    ".py": "Python", ".js": "JavaScript", ".ts": "TypeScript",
-    ".jsx": "React JSX", ".tsx": "React TSX", ".css": "CSS", ".scss": "SCSS",
-    ".html": "HTML", ".json": "JSON", ".yaml": "YAML", ".yml": "YAML",
-    ".toml": "TOML", ".md": "Markdown", ".sql": "SQL", ".sh": "Shell",
-    ".bash": "Bash", ".go": "Go", ".rs": "Rust", ".java": "Java",
-    ".c": "C", ".cpp": "C++", ".h": "C Header", ".hpp": "C++ Header",
+    ".py": "Python",
+    ".js": "JavaScript",
+    ".ts": "TypeScript",
+    ".jsx": "React JSX",
+    ".tsx": "React TSX",
+    ".css": "CSS",
+    ".scss": "SCSS",
+    ".html": "HTML",
+    ".json": "JSON",
+    ".yaml": "YAML",
+    ".yml": "YAML",
+    ".toml": "TOML",
+    ".md": "Markdown",
+    ".sql": "SQL",
+    ".sh": "Shell",
+    ".bash": "Bash",
+    ".go": "Go",
+    ".rs": "Rust",
+    ".java": "Java",
+    ".c": "C",
+    ".cpp": "C++",
+    ".h": "C Header",
+    ".hpp": "C++ Header",
 }
 
 
@@ -353,9 +471,7 @@ class FileWalker:
                 directory.iterdir(), key=lambda x: (not x.is_dir(), x.name)
             )
             items = [
-                item
-                for item in items
-                if not self.is_excluded_dir(item.name)
+                item for item in items if not self.is_excluded_dir(item.name)
             ]
 
             for i, item in enumerate(items):
@@ -442,7 +558,12 @@ class ReportGenerator:
         out.write("=" * 80 + "\n\n")
 
     def write_sensitive_file(
-        self, out, file_path: Path, file_stat: os.stat_result, info: Dict, language: str
+        self,
+        out,
+        file_path: Path,
+        file_stat: os.stat_result,
+        info: Dict,
+        language: str,
     ) -> None:
         """Write sensitive file metadata without content."""
         rel_path = file_path.relative_to(self.project_root)
@@ -560,6 +681,7 @@ class ProjectConsolidator:
         self._output_file: Optional[Path] = None
         self.report_generator = ReportGenerator(self.project_root)
         self.file_walker = FileWalker(self.project_root)
+        self.git_info_provider = GitInfoProvider(self.project_root)
 
     def _get_file_stat(self, file_path: Path) -> Optional[os.stat_result]:
         """
@@ -600,61 +722,6 @@ class ProjectConsolidator:
             if re.search(pattern, file_str, re.IGNORECASE):
                 return True
         return False
-
-    def get_git_info(self) -> Dict[str, str]:
-        """
-        Get current git commit information.
-
-        Returns:
-            Dictionary with commit hash, date, and branch
-        """
-        try:
-            commit_hash = subprocess.check_output(
-                ["git", "rev-parse", "HEAD"],
-                cwd=self.project_root,
-                stderr=subprocess.PIPE,  # Capture errors for logging
-                text=True,
-            ).strip()
-
-            commit_date = subprocess.check_output(
-                ["git", "log", "-1", "--format=%cd", "--date=iso"],
-                cwd=self.project_root,
-                stderr=subprocess.PIPE,
-                text=True,
-            ).strip()
-
-            branch = subprocess.check_output(
-                ["git", "branch", "--show-current"],
-                cwd=self.project_root,
-                stderr=subprocess.PIPE,
-                text=True,
-            ).strip()
-
-            return {
-                "commit": commit_hash[:8],
-                "date": commit_date,
-                "branch": branch,
-            }
-        except subprocess.CalledProcessError as e:
-            if e.stderr:
-                stderr = e.stderr.strip()
-            else:
-                stderr = "No error details"
-            logger.warning(f"Git command failed: {stderr}")
-            return {
-                "commit": "unknown",
-                "date": "unknown",
-                "branch": "unknown",
-            }
-        except FileNotFoundError:
-            logger.warning(
-                "Git executable not found. Please ensure git is installed."
-            )
-            return {
-                "commit": "unknown",
-                "date": "unknown",
-                "branch": "unknown",
-            }
 
     def analyze_sensitive_file(
         self,
@@ -715,7 +782,7 @@ class ProjectConsolidator:
         logger.info(f"Project: {self.project_root}")
         logger.info(f"Output:  {output_file}")
 
-        git_info = self.get_git_info()
+        git_info = self.git_info_provider.get_git_info()
         timestamp = datetime.now()
 
         try:
@@ -731,14 +798,18 @@ class ProjectConsolidator:
                 self.report_generator.write_header(out, timestamp, git_info)
 
                 # Write file tree
-                tree_lines = self.file_walker.build_file_tree(self.project_root)
+                tree_lines = self.file_walker.build_file_tree(
+                    self.project_root
+                )
                 self.report_generator.write_file_tree(out, tree_lines)
 
                 # Walk through project
                 self._process_files(out)
 
                 # Write statistics
-                self.report_generator.write_statistics(out, timestamp, self.stats)
+                self.report_generator.write_statistics(
+                    out, timestamp, self.stats
+                )
 
             logger.info("Consolidation complete!")
             logger.info(f"Output file: {output_file}")
@@ -756,7 +827,9 @@ class ProjectConsolidator:
 
         for root, dirs, files in os.walk(self.project_root):
             # Filter out excluded directories
-            dirs[:] = [d for d in dirs if not self.file_walker.is_excluded_dir(d)]
+            dirs[:] = [
+                d for d in dirs if not self.file_walker.is_excluded_dir(d)
+            ]
 
             root_path = Path(root)
 
@@ -768,7 +841,10 @@ class ProjectConsolidator:
                     continue
                 # Skip any previously written consolidated output file
                 try:
-                    if self._output_file and file_path.resolve() == self._output_file:
+                    if (
+                        self._output_file
+                        and file_path.resolve() == self._output_file
+                    ):
                         continue
                 except Exception:
                     # If resolve fails, fall back to name-based pattern matching
@@ -816,7 +892,12 @@ class ProjectConsolidator:
                     lang_stats[language] = lang_stats.get(language, 0) + 1
 
                     self.report_generator.write_regular_file(
-                        out, file_path, file_stat, content, line_count, language
+                        out,
+                        file_path,
+                        file_stat,
+                        content,
+                        line_count,
+                        language,
                     )
                     self.stats["included_files"] += 1
                 except (OSError, UnicodeDecodeError) as e:
